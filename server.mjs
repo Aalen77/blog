@@ -6,7 +6,7 @@ import mysql from 'mysql2/promise'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
-// ─── MySQL Connection ───
+// ─── MySQL Connection Pool ───
 
 const DB_CONFIG = {
   host: process.env.DB_HOST || 'localhost',
@@ -14,12 +14,22 @@ const DB_CONFIG = {
   user: process.env.DB_USER || 'root',
   password: process.env.DB_PASSWORD || '123456',
   database: process.env.DB_NAME || 'personal_blog',
+  waitForConnections: true,
+  connectionLimit: 5,
+  enableKeepAlive: true,
 }
 
-let db
+let pool
 
-async function initDb() {
-  // First connect without database to create it if needed
+export async function getDb() {
+  if (!pool) {
+    pool = mysql.createPool(DB_CONFIG)
+  }
+  return pool
+}
+
+export async function initDb() {
+  // Create database if needed (requires connecting without database first)
   const tmp = await mysql.createConnection({
     host: DB_CONFIG.host,
     port: DB_CONFIG.port,
@@ -29,8 +39,7 @@ async function initDb() {
   await tmp.execute(`CREATE DATABASE IF NOT EXISTS \`${DB_CONFIG.database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`)
   await tmp.end()
 
-  // Now connect to the database
-  db = await mysql.createConnection(DB_CONFIG)
+  const db = await getDb()
 
   // Create tables
   await db.execute(`
@@ -66,20 +75,13 @@ async function initDb() {
     await db.execute(
       `INSERT INTO resume (name, title, email, phone, summary, skills, experience) VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [
-        '古卡鲁',
-        'AI 应用探索者',
-        'aalenkai@163.com',
-        '15307299123',
+        '古卡鲁', 'AI 应用探索者', 'aalenkai@163.com', '15307299123',
         'VibeCoding 践行者，热衷于用 AI 加速创意落地，专注将大模型能力转化为实用的产品体验。',
         JSON.stringify([
-          { name: 'Python', show: true },
-          { name: 'LangChain', show: true },
-          { name: 'React', show: true },
-          { name: 'TypeScript', show: true },
-          { name: 'AI Agents', show: true },
-          { name: 'RAG', show: true },
-          { name: 'Prompt Engineering', show: true },
-          { name: 'FastAPI', show: true },
+          { name: 'Python', show: true }, { name: 'LangChain', show: true },
+          { name: 'React', show: true }, { name: 'TypeScript', show: true },
+          { name: 'AI Agents', show: true }, { name: 'RAG', show: true },
+          { name: 'Prompt Engineering', show: true }, { name: 'FastAPI', show: true },
         ]),
         JSON.stringify([
           { company: 'AI Studio', role: 'AI 应用开发者', period: '2025-至今', desc: '基于 LLM 构建 AI Agent 应用，负责 RAG 系统设计与 Prompt 工程优化。' },
@@ -107,7 +109,7 @@ async function initDb() {
     }
   }
 
-  console.log('MySQL database initialized')
+  console.log('Database initialized')
 }
 
 function formatRow(row) {
@@ -119,85 +121,85 @@ function formatRow(row) {
   return obj
 }
 
-// ─── Express App ───
-
-const app = express()
-app.use(express.json({ limit: '10mb' }))
-
-const ADMIN_PASSWORD = 'gukalu123'
-
 function auth(req, res, next) {
   const token = req.headers.authorization
-  if (token !== `Bearer ${ADMIN_PASSWORD}`) {
+  if (token !== `Bearer ${process.env.ADMIN_PASSWORD || 'gukalu123'}`) {
     return res.status(401).json({ error: 'Unauthorized' })
   }
   next()
 }
 
-// ─── Resume API ───
+export async function createApp() {
+  await initDb()
+  const db = await getDb()
 
-app.get('/api/resume', async (_req, res) => {
-  const [rows] = await db.execute('SELECT * FROM resume ORDER BY id LIMIT 1')
-  res.json(rows.length ? formatRow(rows[0]) : null)
-})
+  const app = express()
+  app.use(express.json({ limit: '10mb' }))
 
-app.put('/api/resume', auth, async (req, res) => {
-  const r = req.body
-  await db.execute(
-    `UPDATE resume SET name=?, title=?, email=?, phone=?, summary=?, skills=?, experience=?, resumeFileName=?, resumeFileData=? WHERE id=1`,
-    [r.name || '', r.title || '', r.email || '', r.phone || '',
-     r.summary || '', JSON.stringify(r.skills || []), JSON.stringify(r.experience || []),
-     r.resumeFileName || null, r.resumeFileData || null],
-  )
-  res.json({ ok: true })
-})
-
-// ─── Projects API ───
-
-app.get('/api/projects', async (_req, res) => {
-  const [rows] = await db.execute('SELECT * FROM projects ORDER BY id')
-  res.json(rows.map(formatRow))
-})
-
-app.post('/api/projects', auth, async (req, res) => {
-  const p = req.body
-  await db.execute(
-    'INSERT INTO projects (id, title, description, tags, image, link, github) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [p.id, p.title, p.description, JSON.stringify(p.tags || []), p.image || '', p.link || null, p.github || null],
-  )
-  res.json({ ok: true })
-})
-
-app.put('/api/projects/:id', auth, async (req, res) => {
-  const p = req.body
-  await db.execute(
-    'UPDATE projects SET title=?, description=?, tags=?, image=?, link=?, github=? WHERE id=?',
-    [p.title, p.description, JSON.stringify(p.tags || []), p.image || '', p.link || null, p.github || null, req.params.id],
-  )
-  res.json({ ok: true })
-})
-
-app.delete('/api/projects/:id', auth, async (req, res) => {
-  await db.execute('DELETE FROM projects WHERE id = ?', [req.params.id])
-  res.json({ ok: true })
-})
-
-// ─── Serve static frontend ───
-
-const dist = join(__dirname, 'dist')
-if (existsSync(dist)) {
-  app.use(express.static(dist))
-  app.use((_req, res) => {
-    res.sendFile(join(dist, 'index.html'))
+  // Resume API
+  app.get('/api/resume', async (_req, res) => {
+    const [rows] = await db.execute('SELECT * FROM resume ORDER BY id LIMIT 1')
+    res.json(rows.length ? formatRow(rows[0]) : null)
   })
+
+  app.put('/api/resume', auth, async (req, res) => {
+    const r = req.body
+    await db.execute(
+      `UPDATE resume SET name=?, title=?, email=?, phone=?, summary=?, skills=?, experience=?, resumeFileName=?, resumeFileData=? WHERE id=1`,
+      [r.name || '', r.title || '', r.email || '', r.phone || '',
+       r.summary || '', JSON.stringify(r.skills || []), JSON.stringify(r.experience || []),
+       r.resumeFileName || null, r.resumeFileData || null],
+    )
+    res.json({ ok: true })
+  })
+
+  // Projects API
+  app.get('/api/projects', async (_req, res) => {
+    const [rows] = await db.execute('SELECT * FROM projects ORDER BY id')
+    res.json(rows.map(formatRow))
+  })
+
+  app.post('/api/projects', auth, async (req, res) => {
+    const p = req.body
+    await db.execute(
+      'INSERT INTO projects (id, title, description, tags, image, link, github) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [p.id, p.title, p.description, JSON.stringify(p.tags || []), p.image || '', p.link || null, p.github || null],
+    )
+    res.json({ ok: true })
+  })
+
+  app.put('/api/projects/:id', auth, async (req, res) => {
+    const p = req.body
+    await db.execute(
+      'UPDATE projects SET title=?, description=?, tags=?, image=?, link=?, github=? WHERE id=?',
+      [p.title, p.description, JSON.stringify(p.tags || []), p.image || '', p.link || null, p.github || null, req.params.id],
+    )
+    res.json({ ok: true })
+  })
+
+  app.delete('/api/projects/:id', auth, async (req, res) => {
+    await db.execute('DELETE FROM projects WHERE id = ?', [req.params.id])
+    res.json({ ok: true })
+  })
+
+  return app
 }
 
-// ─── Start ───
+// ─── Local dev server ───
+const isDirectRun = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]
+if (isDirectRun) {
+  const PORT = process.env.PORT || 3001
+  const app = await createApp()
 
-const PORT = process.env.PORT || 3001
+  const dist = join(__dirname, 'dist')
+  if (existsSync(dist)) {
+    app.use(express.static(dist))
+    app.use((_req, res) => {
+      res.sendFile(join(dist, 'index.html'))
+    })
+  }
 
-initDb().then(() => {
   app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`)
   })
-})
+}
