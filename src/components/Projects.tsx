@@ -1,4 +1,5 @@
 import { useStore } from '../data/store'
+import type { Project } from '../data/projects'
 
 const gradientBgs = [
   'from-purple-600 to-blue-500',
@@ -11,7 +12,7 @@ function ProjectCard({
   project,
   index,
 }: {
-  project: (typeof import('../data/projects').Project)
+  project: Project
   index: number
 }) {
   return (
@@ -46,7 +47,7 @@ function ProjectCard({
         </h3>
         <p className="leading-relaxed text-gray-400">{project.description}</p>
         <div className="flex flex-wrap gap-2 pt-1">
-          {project.tags.map((tag) => (
+          {project.tags.map((tag: string) => (
             <span
               key={tag}
               className="rounded-full bg-purple-500/10 px-3 py-1 text-xs font-medium text-purple-300"
