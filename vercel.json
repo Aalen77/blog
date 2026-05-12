@@ -7,8 +7,7 @@
   ],
   "functions": {
     "api/index.mjs": {
-      "maxDuration": 30,
-      "memory": 512
+      "maxDuration": 30
     }
   }
 }

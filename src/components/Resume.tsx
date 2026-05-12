@@ -75,21 +75,7 @@ function Resume() {
       )}
 
       {/* Experience */}
-      <section>
-        <h2 className="mb-4 text-2xl font-semibold">工作经历</h2>
-        <div className="space-y-6">
-          {resume.experience.map((exp, i) => (
-            <div key={i} className="border-l-2 border-purple-500/30 pl-4">
-              <div className="flex items-baseline justify-between">
-                <h3 className="text-lg font-semibold text-white">{exp.company}</h3>
-                <span className="text-sm text-gray-500">{exp.period}</span>
-              </div>
-              <p className="text-sm text-purple-400">{exp.role}</p>
-              <p className="mt-1 text-gray-400">{exp.desc}</p>
-            </div>
-          ))}
-        </div>
-      </section>
+      
     </div>
   )
 }
