@@ -1,0 +1,130 @@
+import { useParams, Link } from 'react-router-dom'
+import { useStore } from '../data/store'
+
+const gradientBgs = [
+  'from-purple-600 to-blue-500',
+  'from-pink-500 to-orange-400',
+  'from-teal-400 to-cyan-500',
+  'from-rose-500 to-purple-600',
+]
+
+function ProjectDetail() {
+  const { id } = useParams<{ id: string }>()
+  const { projects } = useStore()
+  const project = projects.find((p) => p.id === id)
+
+  if (!project) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#0d1117]">
+        <div className="text-center">
+          <p className="text-xl text-gray-400">项目不存在</p>
+          <Link to="/" className="mt-4 inline-block text-purple-400 underline">返回首页</Link>
+        </div>
+      </div>
+    )
+  }
+
+  const ext = project.contentFileName?.split('.').pop()?.toLowerCase()
+  const isPdf = ext === 'pdf'
+  const isMd = ext === 'md'
+  const isDoc = ext === 'doc' || ext === 'docx'
+
+  return (
+    <div className="min-h-screen bg-[#0d1117] px-4 py-24 text-white">
+      <div className="mx-auto max-w-4xl">
+        {/* Back */}
+        <Link to="/" className="mb-8 inline-block text-sm text-gray-400 underline transition-colors hover:text-white">
+          &larr; 返回首页
+        </Link>
+
+        {/* Header image */}
+        <div className="mb-10 overflow-hidden rounded-2xl border border-white/10">
+          {project.image ? (
+            <img src={project.image} alt={project.title} className="aspect-video w-full object-cover" />
+          ) : (
+            <div
+              className={`flex aspect-video w-full items-center justify-center bg-gradient-to-br ${gradientBgs[0]}`}
+            >
+              <span className="text-6xl font-bold text-white/30">{project.title.charAt(0)}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Title */}
+        <h1 className="text-4xl font-bold md:text-5xl">{project.title}</h1>
+
+        {/* Tags */}
+        <div className="mt-4 flex flex-wrap gap-2">
+          {project.tags.map((tag) => (
+            <span key={tag} className="rounded-full bg-purple-500/10 px-3 py-1 text-xs font-medium text-purple-300">
+              {tag}
+            </span>
+          ))}
+        </div>
+
+        {/* Description */}
+        <p className="mt-6 text-lg leading-relaxed text-gray-300">{project.description}</p>
+
+        {/* Links */}
+        <div className="mt-8 flex flex-wrap gap-4">
+          {project.link && (
+            <a
+              href={project.link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-full bg-gradient-to-r from-purple-500 to-pink-500 px-6 py-2 font-semibold transition-transform hover:scale-105"
+            >
+              访问项目
+            </a>
+          )}
+          {project.github && (
+            <a
+              href={project.github}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-full border border-white/20 px-6 py-2 font-semibold transition-colors hover:bg-white/10"
+            >
+              GitHub
+            </a>
+          )}
+        </div>
+
+        {/* Uploaded file content */}
+        {project.contentFileData && (
+          <div className="mt-12 rounded-2xl border border-white/10 bg-white/5 p-8">
+            {isPdf && (
+              <embed src={project.contentFileData} type="application/pdf" className="w-full rounded-xl" style={{ height: '80vh', minHeight: 500 }} />
+            )}
+            {isMd && (
+              <pre className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-gray-300">{atob(project.contentFileData.split(',')[1] || '')}</pre>
+            )}
+            {isDoc && (
+              <div className="text-center">
+                <p className="mb-4 text-gray-400">Word 文档</p>
+                <a
+                  href={project.contentFileData}
+                  download={project.contentFileName || 'document.docx'}
+                  className="inline-block rounded-full bg-gradient-to-r from-purple-500 to-pink-500 px-8 py-3 font-semibold transition-transform hover:scale-105"
+                >
+                  下载 {project.contentFileName}
+                </a>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* HTML content */}
+        {project.content && !project.contentFileData && (
+          <div className="mt-12 rounded-2xl border border-white/10 bg-white/5 p-8">
+            <div
+              className="prose prose-invert max-w-none prose-p:text-gray-300 prose-headings:text-white prose-a:text-purple-400 prose-strong:text-white prose-code:text-purple-300 prose-ul:text-gray-300 prose-ol:text-gray-300"
+              dangerouslySetInnerHTML={{ __html: project.content }}
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+export default ProjectDetail

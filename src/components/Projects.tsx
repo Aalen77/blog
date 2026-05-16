@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { useStore } from '../data/store'
 import type { Project } from '../data/projects'
 
@@ -16,10 +17,8 @@ function ProjectCard({
   index: number
 }) {
   return (
-    <a
-      href={project.link || project.github || '#'}
-      target="_blank"
-      rel="noopener noreferrer"
+    <Link
+      to={`/project/${project.id}`}
       className="group block rounded-2xl border border-white/10 bg-white/5 transition-all hover:-translate-y-1 hover:border-purple-500/50"
     >
       <div className="aspect-video overflow-hidden rounded-t-2xl">
@@ -57,7 +56,7 @@ function ProjectCard({
           ))}
         </div>
       </div>
-    </a>
+    </Link>
   )
 }
 
