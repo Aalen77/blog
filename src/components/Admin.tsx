@@ -177,12 +177,17 @@ function Admin() {
   const [contentFileData, setContentFileData] = useState('')
   const [imageFileName, setImageFileName] = useState('')
   const [imageFileData, setImageFileData] = useState('')
+  const [processingImage, setProcessingImage] = useState(false)
+  const [processingContent, setProcessingContent] = useState(false)
+  const [saving, setSaving] = useState(false)
 
   // Drag-and-drop reorder state
   const [dragIndex, setDragIndex] = useState<number | null>(null)
 
-  function handleProjectSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function handleProjectSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
+    if (processingImage || processingContent || saving) return
+    setSaving(true)
     const fd = new FormData(e.currentTarget)
     const id = editingId || crypto.randomUUID()
     const tags = (fd.get('tags') as string).split(',').map((t) => t.trim()).filter(Boolean)
@@ -200,12 +205,16 @@ function Admin() {
       contentFileName: contentFileName || existing?.contentFileName,
       contentFileData: contentFileData || existing?.contentFileData,
     }
+    let ok: boolean
     if (editingId) {
-      updateProject(editingId, project)
-      showToast('项目已更新')
+      ok = await updateProject(editingId, project)
     } else {
-      addProject(project)
-      showToast('项目已添加')
+      ok = await addProject(project)
+    }
+    if (ok) {
+      showToast(editingId ? '项目已更新' : '项目已添加')
+    } else {
+      showToast('保存失败，请检查网络或图片大小')
     }
     setEditingId(null)
     setShowForm(false)
@@ -213,6 +222,7 @@ function Admin() {
     setContentFileData('')
     setImageFileName('')
     setImageFileData('')
+    setSaving(false)
   }
 
   function startEdit(p: Project) {
@@ -259,6 +269,30 @@ function Admin() {
     const reader = new FileReader()
     reader.onload = () => onDone(file.name, reader.result as string)
     reader.readAsDataURL(file)
+  }
+
+  function compressImage(file: File, maxW: number, quality: number): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const img = new Image()
+      img.onload = () => {
+        let { width, height } = img
+        if (width > maxW) {
+          height = Math.round(height * (maxW / width))
+          width = maxW
+        }
+        const canvas = document.createElement('canvas')
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext('2d')!
+        ctx.drawImage(img, 0, 0, width, height)
+        resolve(canvas.toDataURL('image/jpeg', quality))
+      }
+      img.onerror = () => reject(new Error('图片加载失败'))
+      const reader = new FileReader()
+      reader.onload = () => { img.src = reader.result as string }
+      reader.onerror = () => reject(new Error('文件读取失败'))
+      reader.readAsDataURL(file)
+    })
   }
 
   if (!authed) return <AdminLogin onLogin={() => setAuthed(true)} />
@@ -373,6 +407,8 @@ function Admin() {
                   setContentFileData('')
                   setImageFileName('')
                   setImageFileData('')
+                  setProcessingImage(false)
+                  setProcessingContent(false)
                 }}
                 className="rounded-full bg-gradient-to-r from-purple-500 to-pink-500 px-5 py-2 text-sm font-semibold transition-transform hover:scale-105"
               >
@@ -402,8 +438,18 @@ function Admin() {
                 </div>
                 <DropZone
                   accept=".png,.jpg,.jpeg"
-                  fileName={imageFileName}
-                  onFile={(file) => readFileAsDataURL(file, (name, data) => { setImageFileName(name); setImageFileData(data) })}
+                  fileName={processingImage ? '读取中...' : imageFileName}
+                  onFile={(file) => {
+                    setProcessingImage(true)
+                    compressImage(file, 1200, 0.75).then((data) => {
+                      setImageFileName(file.name)
+                      setImageFileData(data)
+                      setProcessingImage(false)
+                    }).catch(() => {
+                      showToast('图片处理失败')
+                      setProcessingImage(false)
+                    })
+                  }}
                   label="页面图片（支持 PNG / JPG / JPEG，拖拽或点击上传）"
                 />
                 <div>
@@ -420,13 +466,24 @@ function Admin() {
                 </div>
                 <DropZone
                   accept=".pdf,.md,.doc,.docx"
-                  fileName={contentFileName}
-                  onFile={(file) => readFileAsDataURL(file, (name, data) => { setContentFileName(name); setContentFileData(data) })}
+                  fileName={processingContent ? '读取中...' : contentFileName}
+                  onFile={(file) => {
+                    setProcessingContent(true)
+                    readFileAsDataURL(file, (name, data) => {
+                      setContentFileName(name)
+                      setContentFileData(data)
+                      setProcessingContent(false)
+                    })
+                  }}
                   label="或上传详情文件（PDF / Markdown / Word）"
                 />
                 <div className="flex gap-3">
-                  <button type="submit" className="rounded-full bg-gradient-to-r from-purple-500 to-pink-500 px-6 py-2 font-semibold">
-                    {editingId ? '更新' : '添加'}
+                  <button
+                    type="submit"
+                    disabled={saving || processingImage || processingContent}
+                    className="rounded-full bg-gradient-to-r from-purple-500 to-pink-500 px-6 py-2 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {saving ? '保存中...' : processingImage || processingContent ? '文件读取中...' : editingId ? '更新' : '添加'}
                   </button>
                   <button type="button" onClick={() => { setShowForm(false); setEditingId(null) }} className="rounded-full border border-white/20 px-6 py-2 transition-colors hover:bg-white/10">
                     取消

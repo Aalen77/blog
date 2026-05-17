@@ -144,7 +144,7 @@ export async function createApp() {
   await initDb()
 
   const app = express()
-  app.use(express.json({ limit: '10mb' }))
+  app.use(express.json({ limit: '50mb' }))
 
   // Prevent CDN/browser caching of API responses
   app.use('/api', (_req, res, next) => {
