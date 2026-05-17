@@ -99,6 +99,8 @@ async function initDb() {
   if (!(await hasColumn('projects', 'contentFileData'))) {
     await sql.query('ALTER TABLE projects ADD COLUMN "contentFileData" TEXT DEFAULT NULL', [])
   }
+  // Ensure image column is TEXT (may have been created as VARCHAR in older schema)
+  await sql.query('ALTER TABLE projects ALTER COLUMN image TYPE TEXT', []).catch(() => {})
 
   const resumeRows = await sql`SELECT id FROM resume LIMIT 1`
   if (resumeRows.length === 0) {
