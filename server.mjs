@@ -10,14 +10,24 @@ const DATABASE_URL_UNPOOLED = process.env.DATABASE_URL_UNPOOLED || process.env.P
 
 function sql(strings, ...values) {
   const db = neon(DATABASE_URL)
-
-function sqlWrite(strings, ...values) {
-  const db = neon(DATABASE_URL_UNPOOLED)
-  // Regular function call: sql('QUERY $1', [params])
   if (typeof strings === 'string') {
     return db.query(strings, values[0] || [])
   }
-  // Tagged template: sql`QUERY ${val}`
+  let query = ''
+  const params = []
+  for (let i = 0; i < values.length; i++) {
+    query += strings[i] + '$' + (i + 1)
+    params.push(values[i])
+  }
+  query += strings[strings.length - 1]
+  return db.query(query, params)
+}
+
+function sqlWrite(strings, ...values) {
+  const db = neon(DATABASE_URL_UNPOOLED)
+  if (typeof strings === 'string') {
+    return db.query(strings, values[0] || [])
+  }
   let query = ''
   const params = []
   for (let i = 0; i < values.length; i++) {
