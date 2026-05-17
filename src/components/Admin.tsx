@@ -1,5 +1,5 @@
 import { useState, useRef, type DragEvent } from 'react'
-import { useStore, ADMIN_PASSWORD, type ResumeData, type Skill } from '../data/store'
+import { useStore, ADMIN_PASSWORD, type ResumeData, type Skill, type ApiResult } from '../data/store'
 import { Link } from 'react-router-dom'
 import type { Project } from '../data/projects'
 import { showToast } from './Toast'
@@ -205,16 +205,16 @@ function Admin() {
       contentFileName: contentFileName || existing?.contentFileName,
       contentFileData: contentFileData || existing?.contentFileData,
     }
-    let ok: boolean
+    let result: ApiResult
     if (editingId) {
-      ok = await updateProject(editingId, project)
+      result = await updateProject(editingId, project)
     } else {
-      ok = await addProject(project)
+      result = await addProject(project)
     }
-    if (ok) {
+    if (result.ok) {
       showToast(editingId ? '项目已更新' : '项目已添加')
     } else {
-      showToast('保存失败，请检查网络或图片大小')
+      showToast(result.error || '保存失败')
     }
     setEditingId(null)
     setShowForm(false)

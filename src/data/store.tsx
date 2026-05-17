@@ -20,12 +20,17 @@ export interface ResumeData {
   resumeFileData?: string
 }
 
+export interface ApiResult {
+  ok: boolean
+  error?: string
+}
+
 interface StoreContextType {
   projects: Project[]
   resume: ResumeData
   loading: boolean
-  addProject: (p: Project) => Promise<boolean>
-  updateProject: (id: string, p: Project) => Promise<boolean>
+  addProject: (p: Project) => Promise<ApiResult>
+  updateProject: (id: string, p: Project) => Promise<ApiResult>
   deleteProject: (id: string) => void
   reorderProjects: (orderedIds: string[]) => void
   setResume: (r: ResumeData) => void
@@ -140,35 +145,33 @@ function isJson(res: Response): boolean {
   return ct !== null && ct.includes('application/json')
 }
 
-async function apiPut(path: string, body: unknown): Promise<boolean> {
+async function apiPut(path: string, body: unknown): Promise<ApiResult> {
   try {
     const res = await fetch(`${API_BASE}${path}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ADMIN_PASSWORD}` },
       body: JSON.stringify(body),
     })
-    if (!res.ok) { console.error(`API PUT ${path} failed: ${res.status}`); return false }
-    if (!isJson(res)) { console.error(`API PUT ${path} returned non-JSON (likely HTML) — API not reached`); return false }
-    return true
+    if (!res.ok) return { ok: false, error: `服务器错误 (${res.status})` }
+    if (!isJson(res)) return { ok: false, error: 'API 未正确响应，可能是部署平台限制' }
+    return { ok: true }
   } catch (e) {
-    console.error(`API PUT ${path} error:`, e)
-    return false
+    return { ok: false, error: '网络请求失败，请检查网络连接' }
   }
 }
 
-async function apiPost(path: string, body: unknown): Promise<boolean> {
+async function apiPost(path: string, body: unknown): Promise<ApiResult> {
   try {
     const res = await fetch(`${API_BASE}${path}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ADMIN_PASSWORD}` },
       body: JSON.stringify(body),
     })
-    if (!res.ok) { console.error(`API POST ${path} failed: ${res.status}`); return false }
-    if (!isJson(res)) { console.error(`API POST ${path} returned non-JSON (likely HTML) — API not reached`); return false }
-    return true
+    if (!res.ok) return { ok: false, error: `服务器错误 (${res.status})` }
+    if (!isJson(res)) return { ok: false, error: 'API 未正确响应，可能是部署平台限制' }
+    return { ok: true }
   } catch (e) {
-    console.error(`API POST ${path} error:`, e)
-    return false
+    return { ok: false, error: '网络请求失败，请检查网络连接' }
   }
 }
 
@@ -202,13 +205,33 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         apiGet<ResumeData | null>('/resume', null) as Promise<ResumeData | null>,
       ])
 
+      // Merge API projects with localStorage — keep local-only projects that failed to sync
+      let merged: Project[] = []
       if (apiProjects.length > 0) {
-        setProjectsState(apiProjects.map(migrateProject))
+        merged = apiProjects.map(migrateProject)
+        const localRaw = localStorage.getItem('blog_projects')
+        if (localRaw) {
+          try {
+            const localProjects: Project[] = JSON.parse(localRaw)
+            const apiIds = new Set(merged.map((p) => p.id))
+            for (const lp of localProjects) {
+              if (!apiIds.has(lp.id)) {
+                merged.push(lp)
+              }
+            }
+          } catch { /* ignore corrupted localStorage */ }
+        }
       } else {
-        const local = localStorage.getItem('blog_projects')
-        if (local) setProjectsState(JSON.parse(local))
-        else setProjectsState(defaultProjects)
+        const localRaw = localStorage.getItem('blog_projects')
+        if (localRaw) {
+          try { merged = JSON.parse(localRaw) } catch { merged = defaultProjects }
+        } else {
+          merged = defaultProjects
+        }
       }
+      merged.sort((a, b) => a.sort_order - b.sort_order)
+      setProjectsState(merged)
+      localStorage.setItem('blog_projects', JSON.stringify(merged))
 
       if (apiResume) {
         setResumeState(migrateResume(apiResume))
@@ -240,27 +263,27 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }
 
   const addProject = async (p: Project) => {
-    const ok = await apiPost('/projects', p)
-    if (ok) {
+    const result = await apiPost('/projects', p)
+    if (result.ok) {
       const updated = await apiGet<Record<string, unknown>[]>('/projects', [])
       if (updated.length > 0) setProjectsState(updated.map(migrateProject))
       else persistProjects([...projects, p])
     } else {
       persistProjects([...projects, p])
     }
-    return ok
+    return result
   }
 
   const updateProject = async (id: string, p: Project) => {
-    const ok = await apiPut(`/projects/${id}`, p)
-    if (ok) {
+    const result = await apiPut(`/projects/${id}`, p)
+    if (result.ok) {
       const updated = await apiGet<Record<string, unknown>[]>('/projects', [])
       if (updated.length > 0) setProjectsState(updated.map(migrateProject))
       else persistProjects(projects.map((item) => (item.id === id ? p : item)))
     } else {
       persistProjects(projects.map((item) => (item.id === id ? p : item)))
     }
-    return ok
+    return result
   }
 
   const deleteProject = async (id: string) => {
