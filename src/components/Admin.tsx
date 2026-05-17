@@ -441,7 +441,7 @@ function Admin() {
                   fileName={processingImage ? '读取中...' : imageFileName}
                   onFile={(file) => {
                     setProcessingImage(true)
-                    compressImage(file, 1200, 0.75).then((data) => {
+                    compressImage(file, 800, 0.6).then((data) => {
                       setImageFileName(file.name)
                       setImageFileData(data)
                       setProcessingImage(false)

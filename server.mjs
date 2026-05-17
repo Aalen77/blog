@@ -185,23 +185,35 @@ export async function createApp() {
   })
 
   app.post('/api/projects', auth, async (req, res) => {
-    const p = req.body
-    const maxRows = await sql`SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_order FROM projects`
-    const nextOrder = p.sort_order ?? maxRows[0].next_order
-    await sql(
-      'INSERT INTO projects (id, title, description, tags, image, link, github, sort_order, content, "contentFileName", "contentFileData") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
-      [p.id, p.title, p.description, JSON.stringify(p.tags || []), p.image || '', p.link || null, p.github || null, nextOrder, p.content || '', p.contentFileName || null, p.contentFileData || null],
-    )
-    res.json({ ok: true })
+    try {
+      const p = req.body
+      console.log('POST /api/projects — image size:', (p.image || '').length, 'bytes')
+      const maxRows = await sql`SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_order FROM projects`
+      const nextOrder = p.sort_order ?? maxRows[0].next_order
+      await sql(
+        'INSERT INTO projects (id, title, description, tags, image, link, github, sort_order, content, "contentFileName", "contentFileData") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
+        [p.id, p.title, p.description, JSON.stringify(p.tags || []), p.image || '', p.link || null, p.github || null, nextOrder, p.content || '', p.contentFileName || null, p.contentFileData || null],
+      )
+      res.json({ ok: true })
+    } catch (err) {
+      console.error('POST /api/projects error:', err.message || err)
+      res.status(500).json({ error: 'Database write failed', detail: err.message })
+    }
   })
 
   app.put('/api/projects/:id', auth, async (req, res) => {
-    const p = req.body
-    await sql(
-      'UPDATE projects SET title=$1, description=$2, tags=$3, image=$4, link=$5, github=$6, sort_order=$7, content=$8, "contentFileName"=$9, "contentFileData"=$10 WHERE id=$11',
-      [p.title, p.description, JSON.stringify(p.tags || []), p.image || '', p.link || null, p.github || null, p.sort_order ?? 0, p.content || '', p.contentFileName || null, p.contentFileData || null, req.params.id],
-    )
-    res.json({ ok: true })
+    try {
+      const p = req.body
+      console.log('PUT /api/projects/' + req.params.id + ' — image size:', (p.image || '').length, 'bytes')
+      await sql(
+        'UPDATE projects SET title=$1, description=$2, tags=$3, image=$4, link=$5, github=$6, sort_order=$7, content=$8, "contentFileName"=$9, "contentFileData"=$10 WHERE id=$11',
+        [p.title, p.description, JSON.stringify(p.tags || []), p.image || '', p.link || null, p.github || null, p.sort_order ?? 0, p.content || '', p.contentFileName || null, p.contentFileData || null, req.params.id],
+      )
+      res.json({ ok: true })
+    } catch (err) {
+      console.error('PUT /api/projects error:', err.message || err)
+      res.status(500).json({ error: 'Database update failed', detail: err.message })
+    }
   })
 
   app.delete('/api/projects/:id', auth, async (req, res) => {
