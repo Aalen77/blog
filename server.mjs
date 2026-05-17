@@ -5,9 +5,14 @@ import { fileURLToPath } from 'url'
 import { neon } from '@neondatabase/serverless'
 
 const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://localhost:5432/personal_blog'
+// Use unpooled connection for writes with large payloads (Neon proxy limits pooled connections)
+const DATABASE_URL_UNPOOLED = process.env.DATABASE_URL_UNPOOLED || process.env.POSTGRES_URL_NON_POOLING || DATABASE_URL
 
 function sql(strings, ...values) {
   const db = neon(DATABASE_URL)
+
+function sqlWrite(strings, ...values) {
+  const db = neon(DATABASE_URL_UNPOOLED)
   // Regular function call: sql('QUERY $1', [params])
   if (typeof strings === 'string') {
     return db.query(strings, values[0] || [])
@@ -25,6 +30,7 @@ function sql(strings, ...values) {
 
 // Expose raw query for DDL statements
 sql.query = (q, params) => neon(DATABASE_URL).query(q, params || [])
+sqlWrite.query = (q, params) => neon(DATABASE_URL_UNPOOLED).query(q, params || [])
 
 async function initDb() {
   await sql`
@@ -190,7 +196,7 @@ export async function createApp() {
       console.log('POST /api/projects — image size:', (p.image || '').length, 'bytes')
       const maxRows = await sql`SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_order FROM projects`
       const nextOrder = p.sort_order ?? maxRows[0].next_order
-      await sql(
+      await sqlWrite(
         'INSERT INTO projects (id, title, description, tags, image, link, github, sort_order, content, "contentFileName", "contentFileData") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
         [p.id, p.title, p.description, JSON.stringify(p.tags || []), p.image || '', p.link || null, p.github || null, nextOrder, p.content || '', p.contentFileName || null, p.contentFileData || null],
       )
@@ -205,7 +211,7 @@ export async function createApp() {
     try {
       const p = req.body
       console.log('PUT /api/projects/' + req.params.id + ' — image size:', (p.image || '').length, 'bytes')
-      await sql(
+      await sqlWrite(
         'UPDATE projects SET title=$1, description=$2, tags=$3, image=$4, link=$5, github=$6, sort_order=$7, content=$8, "contentFileName"=$9, "contentFileData"=$10 WHERE id=$11',
         [p.title, p.description, JSON.stringify(p.tags || []), p.image || '', p.link || null, p.github || null, p.sort_order ?? 0, p.content || '', p.contentFileName || null, p.contentFileData || null, req.params.id],
       )
