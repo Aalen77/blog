@@ -196,10 +196,21 @@ export async function createApp() {
     res.json({ ok: true })
   })
 
-  // Projects API
+  // Projects API — list endpoint excludes large file blobs
   app.get('/api/projects', async (_req, res) => {
     const rows = await sql`SELECT * FROM projects ORDER BY sort_order ASC, id ASC`
-    res.json(rows.map(formatRow))
+    res.json(rows.map((r) => {
+      const obj = formatRow(r)
+      delete obj.contentFileData
+      return obj
+    }))
+  })
+
+  // Single project — returns full data including file blobs
+  app.get('/api/projects/:id', async (req, res) => {
+    const rows = await sql`SELECT * FROM projects WHERE id = ${req.params.id}`
+    if (rows.length === 0) return res.status(404).json({ error: 'Not found' })
+    res.json(formatRow(rows[0]))
   })
 
   app.post('/api/projects', auth, async (req, res) => {
@@ -223,9 +234,15 @@ export async function createApp() {
     try {
       const p = req.body
       console.log('PUT /api/projects/' + req.params.id + ' — image size:', (p.image || '').length, 'bytes')
+      // Only update file fields when explicitly provided (avoid clearing existing files)
+      const hasFile = p.contentFileData !== undefined
       await sqlWrite(
-        'UPDATE projects SET title=$1, description=$2, tags=$3, image=$4, link=$5, github=$6, sort_order=$7, content=$8, "contentFileName"=$9, "contentFileData"=$10 WHERE id=$11',
-        [p.title, p.description, JSON.stringify(p.tags || []), p.image || '', p.link || null, p.github || null, p.sort_order ?? 0, p.content || '', p.contentFileName || null, p.contentFileData || null, req.params.id],
+        hasFile
+          ? 'UPDATE projects SET title=$1, description=$2, tags=$3, image=$4, link=$5, github=$6, sort_order=$7, content=$8, "contentFileName"=$9, "contentFileData"=$10 WHERE id=$11'
+          : 'UPDATE projects SET title=$1, description=$2, tags=$3, image=$4, link=$5, github=$6, sort_order=$7, content=$8 WHERE id=$9',
+        hasFile
+          ? [p.title, p.description, JSON.stringify(p.tags || []), p.image || '', p.link || null, p.github || null, p.sort_order ?? 0, p.content || '', p.contentFileName || null, p.contentFileData || null, req.params.id]
+          : [p.title, p.description, JSON.stringify(p.tags || []), p.image || '', p.link || null, p.github || null, p.sort_order ?? 0, p.content || '', req.params.id],
       )
       res.json({ ok: true })
     } catch (err) {

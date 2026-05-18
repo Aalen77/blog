@@ -1,6 +1,6 @@
 import { useParams, Link } from 'react-router-dom'
 import { useStore } from '../data/store'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 function decodeContentFileData(dataUri: string): string {
   const commaIdx = dataUri.indexOf(',')
@@ -27,11 +27,30 @@ const gradientBgs = [
 
 function ProjectDetail() {
   const { id } = useParams<{ id: string }>()
-  const { projects } = useStore()
+  const { projects, fetchProject } = useStore()
   const [pdfLoaded, setPdfLoaded] = useState(false)
-  const project = projects.find((p) => p.id === id)
+  const [fetchedData, setFetchedData] = useState<Project | null>(null)
+  const [fetching, setFetching] = useState(false)
 
-  if (!project) {
+  const baseProject = projects.find((p) => p.id === id)
+
+  useEffect(() => {
+    if (!id) return
+    const base = projects.find((p) => p.id === id)
+    if (!base || !base.contentFileName) return
+    if (base.contentFileData) return
+    if (fetchedData && fetchedData.id === id) return
+    let cancelled = false
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setFetching(true)
+    fetchProject(id).then((p) => {
+      if (!cancelled && p) setFetchedData(p)
+      if (!cancelled) setFetching(false)
+    })
+    return () => { cancelled = true }
+  }, [id, projects, fetchedData, fetchProject])
+
+  if (!baseProject) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#0d1117]">
         <div className="text-center">
@@ -42,6 +61,9 @@ function ProjectDetail() {
     )
   }
 
+  const project: Project = (fetchedData && fetchedData.id === baseProject.id)
+    ? { ...baseProject, contentFileData: fetchedData.contentFileData, contentFileName: fetchedData.contentFileName || baseProject.contentFileName }
+    : baseProject
   const ext = project.contentFileName?.split('.').pop()?.toLowerCase()
   const isPdf = ext === 'pdf'
   const isMd = ext === 'md'
@@ -108,7 +130,15 @@ function ProjectDetail() {
         </div>
 
         {/* Uploaded file content */}
-        {project.contentFileData && (
+        {fetching && project.contentFileName && (
+          <div className="mt-12 flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 p-8">
+            <div className="text-center">
+              <div className="mx-auto mb-3 size-8 animate-spin rounded-full border-4 border-white/20 border-t-purple-400" />
+              <p className="text-sm text-gray-400">加载文件中...</p>
+            </div>
+          </div>
+        )}
+        {project.contentFileData && !fetching && (
           <div className="mt-12 rounded-2xl border border-white/10 bg-white/5 p-8">
             {isPdf && (
               <div className="relative">

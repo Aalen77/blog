@@ -194,6 +194,7 @@ function Admin() {
     const id = editingId || crypto.randomUUID()
     const tags = (fd.get('tags') as string).split(',').map((t) => t.trim()).filter(Boolean)
     const existing = editingId ? projects.find((p) => p.id === editingId) : null
+    const hasNewContentFile = !!contentFileData
     const project: Project = {
       id,
       title: fd.get('title') as string,
@@ -204,8 +205,8 @@ function Admin() {
       github: (fd.get('github') as string) || undefined,
       sort_order: existing?.sort_order ?? projects.length,
       content: (fd.get('content') as string) || '',
-      contentFileName: contentFileName || existing?.contentFileName,
-      contentFileData: contentFileData || existing?.contentFileData,
+      contentFileName: hasNewContentFile ? contentFileName : (existing?.contentFileName || undefined),
+      contentFileData: hasNewContentFile ? contentFileData : undefined,
     }
     let result: ApiResult
     if (editingId) {
@@ -227,11 +228,22 @@ function Admin() {
     setSaving(false)
   }
 
-  function startEdit(p: Project) {
+  async function startEdit(p: Project) {
     setEditingId(p.id)
     setShowForm(true)
     setContentFileName(p.contentFileName || '')
-    setContentFileData(p.contentFileData || '')
+    setContentFileData('')
+    // Fetch full project data since list excludes contentFileData
+    if (p.contentFileName) {
+      try {
+        const res = await fetch(`/api/projects/${p.id}`)
+        if (res.ok) {
+          const full = await res.json()
+          setContentFileName(full.contentFileName || p.contentFileName || '')
+          setContentFileData(full.contentFileData || '')
+        }
+      } catch { /* keep defaults */ }
+    }
     setImageFileName(p.image ? '已上传图片' : '')
     setImageFileData(p.image || '')
   }

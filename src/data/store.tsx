@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
 import type { Project } from './projects'
 
@@ -34,6 +35,7 @@ interface StoreContextType {
   deleteProject: (id: string) => void
   reorderProjects: (orderedIds: string[]) => void
   setResume: (r: ResumeData) => void
+  fetchProject: (id: string) => Promise<Project | null>
 }
 
 const defaultSkills: Skill[] = [
@@ -155,7 +157,7 @@ async function apiPut(path: string, body: unknown): Promise<ApiResult> {
     if (!res.ok) return { ok: false, error: `服务器错误 (${res.status})` }
     if (!isJson(res)) return { ok: false, error: 'API 未正确响应，可能是部署平台限制' }
     return { ok: true }
-  } catch (e) {
+  } catch {
     return { ok: false, error: '网络请求失败，请检查网络连接' }
   }
 }
@@ -170,7 +172,7 @@ async function apiPost(path: string, body: unknown): Promise<ApiResult> {
     if (!res.ok) return { ok: false, error: `服务器错误 (${res.status})` }
     if (!isJson(res)) return { ok: false, error: 'API 未正确响应，可能是部署平台限制' }
     return { ok: true }
-  } catch (e) {
+  } catch {
     return { ok: false, error: '网络请求失败，请检查网络连接' }
   }
 }
@@ -206,7 +208,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       ])
 
       // Merge API projects with localStorage — keep local-only projects that failed to sync
-      let merged: Project[] = []
+      let merged: Project[]
       if (apiProjects.length > 0) {
         merged = apiProjects.map(migrateProject)
         const localRaw = localStorage.getItem('blog_projects')
@@ -254,12 +256,25 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!loaded) return
-    localStorage.setItem('blog_resume', JSON.stringify(resume))
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { resumeFileData, ...stripped } = resume
+    try {
+      localStorage.setItem('blog_resume', JSON.stringify(stripped))
+    } catch {
+      // localStorage full — non-critical
+    }
   }, [resume, loaded])
 
+  // Strip large file blobs before localStorage to avoid QuotaExceededError
   const persistProjects = (p: Project[]) => {
     setProjectsState(p)
-    localStorage.setItem('blog_projects', JSON.stringify(p))
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const stripped = p.map(({ contentFileData, ...rest }) => rest)
+    try {
+      localStorage.setItem('blog_projects', JSON.stringify(stripped))
+    } catch {
+      // localStorage full — non-critical, data is in API
+    }
   }
 
   const addProject = async (p: Project) => {
@@ -305,12 +320,27 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const setResume = async (r: ResumeData) => {
     setResumeState(r)
-    localStorage.setItem('blog_resume', JSON.stringify(r))
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { resumeFileData, ...stripped } = r
+    try {
+      localStorage.setItem('blog_resume', JSON.stringify(stripped))
+    } catch { /* ignore */ }
     await apiPut('/resume', r)
   }
 
+  const fetchProject = async (id: string): Promise<Project | null> => {
+    try {
+      const res = await fetch(`${API_BASE}/projects/${id}`)
+      if (!res.ok) return null
+      const data = await res.json()
+      return migrateProject(data)
+    } catch {
+      return null
+    }
+  }
+
   return (
-    <StoreContext.Provider value={{ projects, resume, loading, addProject, updateProject, deleteProject, reorderProjects, setResume }}>
+    <StoreContext.Provider value={{ projects, resume, loading, addProject, updateProject, deleteProject, reorderProjects, setResume, fetchProject }}>
       {children}
     </StoreContext.Provider>
   )
