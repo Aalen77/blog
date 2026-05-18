@@ -236,7 +236,10 @@ function Admin() {
     // Fetch full project data since list excludes contentFileData
     if (p.contentFileName) {
       try {
-        const res = await fetch(`/api/projects/${p.id}`)
+        const ctrl = new AbortController()
+        const timer = setTimeout(() => ctrl.abort(), 10000)
+        const res = await fetch(`/api/projects/${p.id}`, { signal: ctrl.signal })
+        clearTimeout(timer)
         if (res.ok) {
           const full = await res.json()
           setContentFileName(full.contentFileName || p.contentFileName || '')

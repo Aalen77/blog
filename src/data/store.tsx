@@ -3,7 +3,19 @@ import { createContext, useContext, useState, useEffect, type ReactNode } from '
 import type { Project } from './projects'
 
 const API_BASE = '/api'
+const FETCH_TIMEOUT = 15000 // 15s — prevents infinite loading if API hangs
 export const ADMIN_PASSWORD = 'gukalu123'
+
+async function fetchWithTimeout(url: string, init?: RequestInit): Promise<Response> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT)
+  try {
+    const res = await fetch(url, { ...init, signal: controller.signal })
+    return res
+  } finally {
+    clearTimeout(timer)
+  }
+}
 
 export interface Skill {
   name: string
@@ -130,7 +142,7 @@ function migrateProject(p: Record<string, unknown>): Project {
 
 async function apiGet<T>(path: string, fallback: T): Promise<T> {
   try {
-    const res = await fetch(`${API_BASE}${path}`)
+    const res = await fetchWithTimeout(`${API_BASE}${path}`)
     if (!res.ok) {
       console.error(`API GET ${path} failed: ${res.status}`)
       return fallback
@@ -149,7 +161,7 @@ function isJson(res: Response): boolean {
 
 async function apiPut(path: string, body: unknown): Promise<ApiResult> {
   try {
-    const res = await fetch(`${API_BASE}${path}`, {
+    const res = await fetchWithTimeout(`${API_BASE}${path}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ADMIN_PASSWORD}` },
       body: JSON.stringify(body),
@@ -164,7 +176,7 @@ async function apiPut(path: string, body: unknown): Promise<ApiResult> {
 
 async function apiPost(path: string, body: unknown): Promise<ApiResult> {
   try {
-    const res = await fetch(`${API_BASE}${path}`, {
+    const res = await fetchWithTimeout(`${API_BASE}${path}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ADMIN_PASSWORD}` },
       body: JSON.stringify(body),
@@ -179,7 +191,7 @@ async function apiPost(path: string, body: unknown): Promise<ApiResult> {
 
 async function apiDelete(path: string): Promise<boolean> {
   try {
-    const res = await fetch(`${API_BASE}${path}`, {
+    const res = await fetchWithTimeout(`${API_BASE}${path}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${ADMIN_PASSWORD}` },
     })
@@ -342,7 +354,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const fetchProject = async (id: string): Promise<Project | null> => {
     try {
-      const res = await fetch(`${API_BASE}/projects/${id}`)
+      const res = await fetchWithTimeout(`${API_BASE}/projects/${id}`)
       if (!res.ok) return null
       const data = await res.json()
       return migrateProject(data)

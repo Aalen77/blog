@@ -196,14 +196,10 @@ export async function createApp() {
     res.json({ ok: true })
   })
 
-  // Projects API — list endpoint excludes large file blobs
+  // Projects API — list endpoint excludes large file blob to keep response small
   app.get('/api/projects', async (_req, res) => {
-    const rows = await sql`SELECT * FROM projects ORDER BY sort_order ASC, id ASC`
-    res.json(rows.map((r) => {
-      const obj = formatRow(r)
-      delete obj.contentFileData
-      return obj
-    }))
+    const rows = await sql`SELECT id, title, description, tags, image, link, github, sort_order, content, "contentFileName" FROM projects ORDER BY sort_order ASC, id ASC`
+    res.json(rows.map(formatRow))
   })
 
   // Single project — returns full data including file blobs
