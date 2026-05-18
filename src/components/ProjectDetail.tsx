@@ -1,5 +1,6 @@
 import { useParams, Link } from 'react-router-dom'
 import { useStore } from '../data/store'
+import type { Project } from '../data/projects'
 import { useState, useEffect, useMemo } from 'react'
 
 function decodeContentFileData(dataUri: string): string {

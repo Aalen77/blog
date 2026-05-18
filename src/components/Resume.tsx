@@ -103,6 +103,58 @@ function Resume() {
         </div>
       </div>
 
+      {/* Experience */}
+      {resume.experience?.length > 0 && (
+        <div className="mx-auto mt-10 max-w-6xl px-6">
+          <div className="rounded-3xl border border-white/10 bg-white/[0.02] p-8 backdrop-blur-sm">
+            <h2 className="mb-6 text-lg font-semibold text-purple-400">工作经历</h2>
+            <div className="space-y-6">
+              {resume.experience.map((exp, i) => (
+                <div key={i} className="relative border-l-2 border-purple-500/30 pl-6 pb-2 last:pb-0">
+                  <div className="absolute -left-1.5 top-1 size-3 rounded-full bg-purple-500" />
+                  <span className="text-xs text-purple-400">{exp.period}</span>
+                  <h3 className="text-base font-semibold text-white">{exp.role}</h3>
+                  <p className="text-sm text-gray-400">{exp.company}</p>
+                  {exp.details.length > 0 && (
+                    <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-gray-400">
+                      {exp.details.map((d, j) => (
+                        <li key={j}>{d}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Education */}
+      {resume.education?.length > 0 && (
+        <div className="mx-auto mt-6 max-w-6xl px-6">
+          <div className="rounded-3xl border border-white/10 bg-white/[0.02] p-8 backdrop-blur-sm">
+            <h2 className="mb-6 text-lg font-semibold text-purple-400">教育背景</h2>
+            <div className="space-y-6">
+              {resume.education.map((edu, i) => (
+                <div key={i} className="relative border-l-2 border-purple-500/30 pl-6">
+                  <div className="absolute -left-1.5 top-1 size-3 rounded-full bg-purple-500" />
+                  <span className="text-xs text-purple-400">{edu.period}</span>
+                  <h3 className="text-base font-semibold text-white">{edu.school}</h3>
+                  <p className="text-sm text-gray-400">{edu.degree}</p>
+                  {edu.details.length > 0 && (
+                    <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-gray-400">
+                      {edu.details.map((d, j) => (
+                        <li key={j}>{d}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Resume File */}
       {resume.resumeFileData && (
         <div className="mx-auto mt-10 max-w-6xl px-6">

@@ -415,6 +415,115 @@ function Admin() {
                   <textarea className={inputCls} rows={3} value={resumeForm.summary} onChange={(e) => setResumeForm({ ...resumeForm, summary: e.target.value })} />
                 </div>
                 <SkillToggles skills={resumeForm.skills} onChange={(skills) => setResumeForm({ ...resumeForm, skills })} />
+
+                {/* Experience */}
+                <div>
+                  <label className="text-sm text-gray-400">工作经历</label>
+                  {(resumeForm.experience || []).map((exp, ei) => (
+                    <div key={ei} className="mb-3 rounded-lg border border-white/10 p-3">
+                      <div className="grid gap-2 sm:grid-cols-3">
+                        <div>
+                          <label className="text-xs text-gray-500">时间</label>
+                          <input className={inputCls} value={exp.period} onChange={(e) => {
+                            const updated = [...(resumeForm.experience || [])]
+                            updated[ei] = { ...updated[ei], period: e.target.value }
+                            setResumeForm({ ...resumeForm, experience: updated })
+                          }} />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-500">职位</label>
+                          <input className={inputCls} value={exp.role} onChange={(e) => {
+                            const updated = [...(resumeForm.experience || [])]
+                            updated[ei] = { ...updated[ei], role: e.target.value }
+                            setResumeForm({ ...resumeForm, experience: updated })
+                          }} />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-500">公司/组织</label>
+                          <input className={inputCls} value={exp.company} onChange={(e) => {
+                            const updated = [...(resumeForm.experience || [])]
+                            updated[ei] = { ...updated[ei], company: e.target.value }
+                            setResumeForm({ ...resumeForm, experience: updated })
+                          }} />
+                        </div>
+                      </div>
+                      <label className="mt-2 text-xs text-gray-500">详细描述（每行一个）</label>
+                      <textarea
+                        className={inputCls}
+                        rows={3}
+                        value={(exp.details || []).join('\n')}
+                        onChange={(e) => {
+                          const updated = [...(resumeForm.experience || [])]
+                          updated[ei] = { ...updated[ei], details: e.target.value.split('\n').filter((s) => s.trim()) }
+                          setResumeForm({ ...resumeForm, experience: updated })
+                        }}
+                      />
+                      <button type="button" onClick={() => {
+                        const updated = [...(resumeForm.experience || [])]
+                        updated.splice(ei, 1)
+                        setResumeForm({ ...resumeForm, experience: updated })
+                      }} className="mt-2 text-xs text-red-400 hover:text-red-300">删除此项</button>
+                    </div>
+                  ))}
+                  <button type="button" onClick={() => {
+                    setResumeForm({ ...resumeForm, experience: [...(resumeForm.experience || []), { period: '', role: '', company: '', details: [] }] })
+                  }} className="text-sm text-purple-400 hover:text-purple-300">+ 添加经历</button>
+                </div>
+
+                {/* Education */}
+                <div>
+                  <label className="text-sm text-gray-400">教育背景</label>
+                  {(resumeForm.education || []).map((edu, ei) => (
+                    <div key={ei} className="mb-3 rounded-lg border border-white/10 p-3">
+                      <div className="grid gap-2 sm:grid-cols-3">
+                        <div>
+                          <label className="text-xs text-gray-500">时间</label>
+                          <input className={inputCls} value={edu.period} onChange={(e) => {
+                            const updated = [...(resumeForm.education || [])]
+                            updated[ei] = { ...updated[ei], period: e.target.value }
+                            setResumeForm({ ...resumeForm, education: updated })
+                          }} />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-500">学校</label>
+                          <input className={inputCls} value={edu.school} onChange={(e) => {
+                            const updated = [...(resumeForm.education || [])]
+                            updated[ei] = { ...updated[ei], school: e.target.value }
+                            setResumeForm({ ...resumeForm, education: updated })
+                          }} />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-500">学位/专业</label>
+                          <input className={inputCls} value={edu.degree} onChange={(e) => {
+                            const updated = [...(resumeForm.education || [])]
+                            updated[ei] = { ...updated[ei], degree: e.target.value }
+                            setResumeForm({ ...resumeForm, education: updated })
+                          }} />
+                        </div>
+                      </div>
+                      <label className="mt-2 text-xs text-gray-500">详细描述（每行一个）</label>
+                      <textarea
+                        className={inputCls}
+                        rows={3}
+                        value={(edu.details || []).join('\n')}
+                        onChange={(e) => {
+                          const updated = [...(resumeForm.education || [])]
+                          updated[ei] = { ...updated[ei], details: e.target.value.split('\n').filter((s) => s.trim()) }
+                          setResumeForm({ ...resumeForm, education: updated })
+                        }}
+                      />
+                      <button type="button" onClick={() => {
+                        const updated = [...(resumeForm.education || [])]
+                        updated.splice(ei, 1)
+                        setResumeForm({ ...resumeForm, education: updated })
+                      }} className="mt-2 text-xs text-red-400 hover:text-red-300">删除此项</button>
+                    </div>
+                  ))}
+                  <button type="button" onClick={() => {
+                    setResumeForm({ ...resumeForm, education: [...(resumeForm.education || []), { period: '', school: '', degree: '', details: [] }] })
+                  }} className="text-sm text-purple-400 hover:text-purple-300">+ 添加教育</button>
+                </div>
+
                 <DropZone
                   accept=".pdf,.doc,.docx"
                   fileName={resumeForm.resumeFileName || ''}
