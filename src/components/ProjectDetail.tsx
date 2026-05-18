@@ -1,6 +1,6 @@
 import { useParams, Link } from 'react-router-dom'
 import { useStore } from '../data/store'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 
 function decodeContentFileData(dataUri: string): string {
   const commaIdx = dataUri.indexOf(',')
@@ -16,6 +16,28 @@ function decodeContentFileData(dataUri: string): string {
     return new TextDecoder('utf-8').decode(bytes)
   }
   return decodeURIComponent(payload)
+}
+
+function dataUriToBlobUrl(dataUri: string): string | null {
+  try {
+    const commaIdx = dataUri.indexOf(',')
+    if (commaIdx === -1) return null
+    const meta = dataUri.slice(0, commaIdx)
+    const payload = dataUri.slice(commaIdx + 1)
+    const mimeMatch = meta.match(/data:(.*?)(;|$)/)
+    const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream'
+    if (meta.includes(';base64')) {
+      const binary = atob(payload)
+      const bytes = new Uint8Array(binary.length)
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i)
+      }
+      return URL.createObjectURL(new Blob([bytes], { type: mime }))
+    }
+    return URL.createObjectURL(new Blob([decodeURIComponent(payload)], { type: mime }))
+  } catch {
+    return null
+  }
 }
 
 const gradientBgs = [
@@ -50,6 +72,24 @@ function ProjectDetail() {
     return () => { cancelled = true }
   }, [id, projects, fetchedData, fetchProject])
 
+  const project: Project = (fetchedData && fetchedData.id === baseProject.id)
+    ? { ...baseProject, contentFileData: fetchedData.contentFileData, contentFileName: fetchedData.contentFileName || baseProject.contentFileName }
+    : baseProject
+
+  const ext = project.contentFileName?.split('.').pop()?.toLowerCase()
+  const isPdf = ext === 'pdf'
+  const isMd = ext === 'md'
+  const isDoc = ext === 'doc' || ext === 'docx'
+
+  const pdfBlobUrl = useMemo(() => {
+    if (!project.contentFileData || !isPdf) return null
+    return dataUriToBlobUrl(project.contentFileData)
+  }, [project.contentFileData, isPdf])
+
+  useEffect(() => {
+    return () => { if (pdfBlobUrl) URL.revokeObjectURL(pdfBlobUrl) }
+  }, [pdfBlobUrl])
+
   if (!baseProject) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#0d1117]">
@@ -60,14 +100,6 @@ function ProjectDetail() {
       </div>
     )
   }
-
-  const project: Project = (fetchedData && fetchedData.id === baseProject.id)
-    ? { ...baseProject, contentFileData: fetchedData.contentFileData, contentFileName: fetchedData.contentFileName || baseProject.contentFileName }
-    : baseProject
-  const ext = project.contentFileName?.split('.').pop()?.toLowerCase()
-  const isPdf = ext === 'pdf'
-  const isMd = ext === 'md'
-  const isDoc = ext === 'doc' || ext === 'docx'
 
   return (
     <div className="min-h-screen bg-[#0d1117] px-4 py-24 text-white">
@@ -141,17 +173,17 @@ function ProjectDetail() {
         {project.contentFileData && !fetching && (
           <div className="mt-12 rounded-2xl border border-white/10 bg-white/5 p-8">
             {isPdf && (
-              <div className="relative">
+              <div className="relative" key={pdfBlobUrl}>
                 {!pdfLoaded && (
                   <div className="flex items-center justify-center rounded-xl border border-white/10 bg-white/5" style={{ height: '80vh', minHeight: 500 }}>
                     <div className="text-center">
                       <div className="mx-auto mb-3 size-10 animate-spin rounded-full border-4 border-white/20 border-t-purple-400" />
-                      <p className="text-sm text-gray-400">PDF 加载中，大文件可能需要较长时间...</p>
+                      <p className="text-sm text-gray-400">PDF 加载中...</p>
                     </div>
                   </div>
                 )}
                 <embed
-                  src={project.contentFileData}
+                  src={pdfBlobUrl || ''}
                   type="application/pdf"
                   className={`w-full rounded-xl ${pdfLoaded ? '' : 'absolute inset-0 opacity-0'}`}
                   style={{ height: '80vh', minHeight: 500 }}

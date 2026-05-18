@@ -1,11 +1,42 @@
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useStore } from '../data/store'
 import { Link } from 'react-router-dom'
+
+function dataUriToBlobUrl(dataUri: string): string | null {
+  try {
+    const commaIdx = dataUri.indexOf(',')
+    if (commaIdx === -1) return null
+    const meta = dataUri.slice(0, commaIdx)
+    const payload = dataUri.slice(commaIdx + 1)
+    const mimeMatch = meta.match(/data:(.*?)(;|$)/)
+    const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream'
+    if (meta.includes(';base64')) {
+      const binary = atob(payload)
+      const bytes = new Uint8Array(binary.length)
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i)
+      }
+      return URL.createObjectURL(new Blob([bytes], { type: mime }))
+    }
+    return URL.createObjectURL(new Blob([decodeURIComponent(payload)], { type: mime }))
+  } catch {
+    return null
+  }
+}
 
 function Resume() {
   const { resume } = useStore()
   const [pdfLoaded, setPdfLoaded] = useState(false)
   const isPdf = resume.resumeFileName?.toLowerCase().endsWith('.pdf')
+
+  const pdfBlobUrl = useMemo(() => {
+    if (!resume.resumeFileData || !isPdf) return null
+    return dataUriToBlobUrl(resume.resumeFileData)
+  }, [resume.resumeFileData, isPdf])
+
+  useEffect(() => {
+    return () => { if (pdfBlobUrl) URL.revokeObjectURL(pdfBlobUrl) }
+  }, [pdfBlobUrl])
 
   return (
     <div className="min-h-screen bg-[#0d1117] py-24 text-white">
@@ -78,17 +109,17 @@ function Resume() {
           <div className="rounded-3xl border border-white/10 bg-white/[0.02] p-8 backdrop-blur-sm">
             <h2 className="mb-5 text-lg font-semibold text-purple-400">简历文件</h2>
             {isPdf ? (
-              <div className="relative">
+              <div className="relative" key={pdfBlobUrl}>
                 {!pdfLoaded && (
                   <div className="flex items-center justify-center rounded-xl border border-white/10 bg-white/5" style={{ height: '80vh', minHeight: 500 }}>
                     <div className="text-center">
                       <div className="mx-auto mb-3 size-10 animate-spin rounded-full border-4 border-white/20 border-t-purple-400" />
-                      <p className="text-sm text-gray-400">PDF 加载中，大文件可能需要较长时间...</p>
+                      <p className="text-sm text-gray-400">PDF 加载中...</p>
                     </div>
                   </div>
                 )}
                 <embed
-                  src={resume.resumeFileData}
+                  src={pdfBlobUrl || ''}
                   type="application/pdf"
                   className={`w-full rounded-xl border border-white/10 ${pdfLoaded ? '' : 'absolute inset-0 opacity-0'}`}
                   style={{ height: '80vh', minHeight: 500 }}
