@@ -181,6 +181,8 @@ function Admin() {
   const [processingContent, setProcessingContent] = useState(false)
   const [saving, setSaving] = useState(false)
 
+  const MAX_FILE_SIZE = 15 * 1024 * 1024 // 15MB
+
   // Drag-and-drop reorder state
   const [dragIndex, setDragIndex] = useState<number | null>(null)
 
@@ -266,9 +268,34 @@ function Admin() {
   }
 
   function readFileAsDataURL(file: File, onDone: (name: string, data: string) => void) {
+    if (file.size > MAX_FILE_SIZE) {
+      showToast(`文件过大（${(file.size / 1024 / 1024).toFixed(1)}MB），请压缩后重试或上传小于 15MB 的文件`)
+      return
+    }
     const reader = new FileReader()
-    reader.onload = () => onDone(file.name, reader.result as string)
+    reader.onload = () => {
+      onDone(file.name, reader.result as string)
+    }
+    reader.onerror = () => {
+      showToast('文件读取失败')
+    }
     reader.readAsDataURL(file)
+  }
+
+  function readFileAsText(file: File, onDone: (name: string, data: string) => void) {
+    if (file.size > MAX_FILE_SIZE) {
+      showToast(`文件过大（${(file.size / 1024 / 1024).toFixed(1)}MB），请压缩后重试或上传小于 15MB 的文件`)
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = () => {
+      const text = reader.result as string
+      onDone(file.name, 'data:text/markdown;charset=utf-8,' + encodeURIComponent(text))
+    }
+    reader.onerror = () => {
+      showToast('文件读取失败')
+    }
+    reader.readAsText(file, 'UTF-8')
   }
 
   function compressImage(file: File, maxW: number, quality: number): Promise<string> {
@@ -377,7 +404,7 @@ function Admin() {
                   accept=".pdf,.doc,.docx"
                   fileName={resumeForm.resumeFileName || ''}
                   onFile={(file) => readFileAsDataURL(file, (name, data) => setResumeForm({ ...resumeForm, resumeFileName: name, resumeFileData: data }))}
-                  label="上传简历文件（PDF / Word）"
+                  label="上传简历文件（PDF / Word，单文件不超过 15MB）"
                 />
                 <button type="submit" className="rounded-full bg-gradient-to-r from-purple-500 to-pink-500 px-6 py-2 font-semibold">
                   保存简历
@@ -469,13 +496,19 @@ function Admin() {
                   fileName={processingContent ? '读取中...' : contentFileName}
                   onFile={(file) => {
                     setProcessingContent(true)
-                    readFileAsDataURL(file, (name, data) => {
+                    const isMdFile = file.name.toLowerCase().endsWith('.md')
+                    const contentCallback = (name: string, data: string) => {
                       setContentFileName(name)
                       setContentFileData(data)
                       setProcessingContent(false)
-                    })
+                    }
+                    if (isMdFile) {
+                      readFileAsText(file, contentCallback)
+                    } else {
+                      readFileAsDataURL(file, contentCallback)
+                    }
                   }}
-                  label="或上传详情文件（PDF / Markdown / Word）"
+                  label="或上传详情文件（PDF / Markdown / Word，单文件不超过 15MB）"
                 />
                 <div className="flex gap-3">
                   <button

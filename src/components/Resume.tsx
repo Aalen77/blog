@@ -1,8 +1,10 @@
+import { useState } from 'react'
 import { useStore } from '../data/store'
 import { Link } from 'react-router-dom'
 
 function Resume() {
   const { resume } = useStore()
+  const [pdfLoaded, setPdfLoaded] = useState(false)
   const isPdf = resume.resumeFileName?.toLowerCase().endsWith('.pdf')
 
   return (
@@ -76,12 +78,23 @@ function Resume() {
           <div className="rounded-3xl border border-white/10 bg-white/[0.02] p-8 backdrop-blur-sm">
             <h2 className="mb-5 text-lg font-semibold text-purple-400">简历文件</h2>
             {isPdf ? (
-              <embed
-                src={resume.resumeFileData}
-                type="application/pdf"
-                className="w-full rounded-xl border border-white/10"
-                style={{ height: '80vh', minHeight: 500 }}
-              />
+              <div className="relative">
+                {!pdfLoaded && (
+                  <div className="flex items-center justify-center rounded-xl border border-white/10 bg-white/5" style={{ height: '80vh', minHeight: 500 }}>
+                    <div className="text-center">
+                      <div className="mx-auto mb-3 size-10 animate-spin rounded-full border-4 border-white/20 border-t-purple-400" />
+                      <p className="text-sm text-gray-400">PDF 加载中，大文件可能需要较长时间...</p>
+                    </div>
+                  </div>
+                )}
+                <embed
+                  src={resume.resumeFileData}
+                  type="application/pdf"
+                  className={`w-full rounded-xl border border-white/10 ${pdfLoaded ? '' : 'absolute inset-0 opacity-0'}`}
+                  style={{ height: '80vh', minHeight: 500 }}
+                  onLoad={() => setPdfLoaded(true)}
+                />
+              </div>
             ) : (
               <a
                 href={resume.resumeFileData}

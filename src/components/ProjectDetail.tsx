@@ -1,5 +1,22 @@
 import { useParams, Link } from 'react-router-dom'
 import { useStore } from '../data/store'
+import { useState } from 'react'
+
+function decodeContentFileData(dataUri: string): string {
+  const commaIdx = dataUri.indexOf(',')
+  if (commaIdx === -1) return ''
+  const payload = dataUri.slice(commaIdx + 1)
+  const meta = dataUri.slice(0, commaIdx)
+  if (meta.includes(';base64')) {
+    const binary = atob(payload)
+    const bytes = new Uint8Array(binary.length)
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i)
+    }
+    return new TextDecoder('utf-8').decode(bytes)
+  }
+  return decodeURIComponent(payload)
+}
 
 const gradientBgs = [
   'from-purple-600 to-blue-500',
@@ -11,6 +28,7 @@ const gradientBgs = [
 function ProjectDetail() {
   const { id } = useParams<{ id: string }>()
   const { projects } = useStore()
+  const [pdfLoaded, setPdfLoaded] = useState(false)
   const project = projects.find((p) => p.id === id)
 
   if (!project) {
@@ -93,10 +111,26 @@ function ProjectDetail() {
         {project.contentFileData && (
           <div className="mt-12 rounded-2xl border border-white/10 bg-white/5 p-8">
             {isPdf && (
-              <embed src={project.contentFileData} type="application/pdf" className="w-full rounded-xl" style={{ height: '80vh', minHeight: 500 }} />
+              <div className="relative">
+                {!pdfLoaded && (
+                  <div className="flex items-center justify-center rounded-xl border border-white/10 bg-white/5" style={{ height: '80vh', minHeight: 500 }}>
+                    <div className="text-center">
+                      <div className="mx-auto mb-3 size-10 animate-spin rounded-full border-4 border-white/20 border-t-purple-400" />
+                      <p className="text-sm text-gray-400">PDF 加载中，大文件可能需要较长时间...</p>
+                    </div>
+                  </div>
+                )}
+                <embed
+                  src={project.contentFileData}
+                  type="application/pdf"
+                  className={`w-full rounded-xl ${pdfLoaded ? '' : 'absolute inset-0 opacity-0'}`}
+                  style={{ height: '80vh', minHeight: 500 }}
+                  onLoad={() => setPdfLoaded(true)}
+                />
+              </div>
             )}
             {isMd && (
-              <pre className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-gray-300">{atob(project.contentFileData.split(',')[1] || '')}</pre>
+              <pre className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-gray-300">{decodeContentFileData(project.contentFileData!)}</pre>
             )}
             {isDoc && (
               <div className="text-center">
