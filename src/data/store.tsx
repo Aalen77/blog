@@ -210,7 +210,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       // Merge API projects with localStorage — keep local-only projects that failed to sync
       let merged: Project[]
       if (apiProjects.length > 0) {
-        merged = apiProjects.map(migrateProject)
+        // Strip contentFileData in case the server hasn't updated yet
+        merged = apiProjects.map((row) => {
+          const p = migrateProject(row)
+          p.contentFileData = undefined
+          return p
+        })
         const localRaw = localStorage.getItem('blog_projects')
         if (localRaw) {
           try {
@@ -218,7 +223,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             const apiIds = new Set(merged.map((p) => p.id))
             for (const lp of localProjects) {
               if (!apiIds.has(lp.id)) {
-                merged.push(lp)
+                // Strip blob from localStorage-origin projects too
+                merged.push({ ...lp, contentFileData: undefined })
               }
             }
           } catch { /* ignore corrupted localStorage */ }
@@ -233,14 +239,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
       merged.sort((a, b) => a.sort_order - b.sort_order)
       setProjectsState(merged)
-      localStorage.setItem('blog_projects', JSON.stringify(merged))
+      try {
+        localStorage.setItem('blog_projects', JSON.stringify(merged))
+      } catch { /* localStorage full — ok */ }
 
       if (apiResume) {
         setResumeState(migrateResume(apiResume))
       } else {
         const local = localStorage.getItem('blog_resume')
-        if (local) setResumeState(migrateResume(JSON.parse(local)))
-        else setResumeState(defaultResume)
+        if (local) {
+          try { setResumeState(migrateResume(JSON.parse(local))) }
+          catch { setResumeState(defaultResume) }
+        } else {
+          setResumeState(defaultResume)
+        }
       }
 
       setLoading(false)
